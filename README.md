@@ -7,8 +7,9 @@ A stopwatch for the Nothing Phone (4a) Pro that shows on the Glyph Matrix.
 * Press volume down twice within about 400 ms: restart from 0:00 (two quick buzzes).
 * Pick the phone up: the final time shows for 5 seconds, then the timer resets and the matrix turns off.
 
-The 4a Pro matrix is 13 x 13 LEDs, too narrow for `mm:ss` on one line, so minutes sit above
-seconds. From 100 minutes on it shows hours above minutes. While paused the digits blink dimmed.
+The 4a Pro matrix is a 13 x 13 grid with 137 LEDs in a circle (the corners have none), too
+narrow for `mm:ss` on one line, so minutes sit above seconds. The digits use rows 1 to 11 and
+columns 3 to 9, which are all inside the circle. From 100 minutes on it shows hours above minutes. While paused the digits blink dimmed.
 
 ## Build
 

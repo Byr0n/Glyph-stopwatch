@@ -38,6 +38,33 @@ class MatrixDigitsTest {
     }
 
     @Test
+    fun staysInsideThePhone4aProLeds() {
+        // The 13x13 grid has 137 LEDs in a circle; the corners have none.
+        // From the LED allocation image in Nothing's GlyphMatrix Developer Kit.
+        val leds = """
+            ....#####....
+            ..#########..
+            .###########.
+            .###########.
+            #############
+            #############
+            #############
+            #############
+            #############
+            .###########.
+            .###########.
+            ..#########..
+            ....#####....
+        """.trimIndent().replace("\n", "")
+        assertEquals(137, leds.count { it == '#' })
+        for (top in 0..99) for (bottom in 0..99) {
+            MatrixDigits.renderPair(top, bottom, 13).forEachIndexed { i, b ->
+                if (b > 0) assertEquals("pixel $i for $top/$bottom", '#', leds[i])
+            }
+        }
+    }
+
+    @Test
     fun usesRequestedBrightness() {
         val frame = MatrixDigits.render(0, 13, brightness = 90)
         assertEquals(setOf(0, 90), frame.toSet())
