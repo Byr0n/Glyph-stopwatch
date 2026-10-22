@@ -16,17 +16,27 @@ import kotlin.math.sqrt
 class ShakeFilter(
     private val minSamples: Int = 3,
     private val windowMs: Long = 500L,
-    private val calmMs: Long = 300L,
+    private val calmMs: Long = 200L,
     private val faceDownGravityZ: Float = -7.0f,
 ) {
-    private val gravity = floatArrayOf(0f, 0f, -GRAVITY)
+    private val gravity = FloatArray(3)
+    private var hasGravity = false
     private val hits = ArrayDeque<Long>()
     private var quietUntilMs = 0L
-    private var lastMovementMs: Long? = null
+    private var awaitingCalm = false
+
+    /** When movement was last above the threshold, or null if it has not been yet. */
+    var lastMovementMs: Long? = null
+        private set
 
     /** Returns true when this sample completes a shake. */
     fun onSample(x: Float, y: Float, z: Float, nowMs: Long, threshold: Float, requireFaceDown: Boolean): Boolean {
         val sample = floatArrayOf(x, y, z)
+        if (!hasGravity) {
+            // Start from the first reading rather than guessing which way up the phone is.
+            sample.copyInto(gravity)
+            hasGravity = true
+        }
         var movement = 0f
         for (i in 0..2) {
             gravity[i] = ALPHA * gravity[i] + (1 - ALPHA) * sample[i]
@@ -34,11 +44,10 @@ class ShakeFilter(
             movement += linear * linear
         }
         val moving = sqrt(movement) > threshold
-        val lastMovement = lastMovementMs
-        if (lastMovement != null) {
+        if (moving) lastMovementMs = nowMs
+        if (awaitingCalm) {
             // Still settling after the last shake.
-            if (moving) lastMovementMs = nowMs
-            else if (nowMs - lastMovement >= calmMs) lastMovementMs = null
+            if (nowMs - (lastMovementMs ?: nowMs) >= calmMs) awaitingCalm = false
             return false
         }
         if (nowMs < quietUntilMs || (requireFaceDown && gravity[2] > faceDownGravityZ)) {
@@ -49,19 +58,19 @@ class ShakeFilter(
         while (hits.isNotEmpty() && nowMs - hits.first() > windowMs) hits.removeFirst()
         if (hits.size < minSamples) return false
         hits.clear()
-        lastMovementMs = nowMs
+        awaitingCalm = true
         return true
     }
 
     /** Ignores movement for [quietMs], e.g. so setting the phone down is not taken as a shake. */
     fun reset(nowMs: Long, quietMs: Long = 1_000L) {
         hits.clear()
+        awaitingCalm = false
         lastMovementMs = null
         quietUntilMs = nowMs + quietMs
     }
 
     private companion object {
         const val ALPHA = 0.8f
-        const val GRAVITY = 9.81f
     }
 }

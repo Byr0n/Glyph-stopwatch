@@ -5,10 +5,11 @@ A stopwatch for the Nothing Phone (4a) Pro that shows on the Glyph Matrix.
 * Place the phone face down: the stopwatch starts.
 * Lift it: pause (one short buzz). Place it back down: it carries on from there (one short buzz).
   A pause in the hand ends on its own after 10 minutes.
-* Shake it once: reset to 0:00 (two quick buzzes). Face down it keeps counting; in the hand it
-  waits at 0:00 until placed down. A single shake takes effect after about 1.5 seconds, the
-  time allowed for a second shake.
-* Shake it twice (shake, stop, shake): turn off (one long buzz). The timer stops and the
+* Shake it once: reset to 00 (two quick buzzes). Face down it keeps counting; in the hand it
+  waits at 00 until placed down. A single shake takes effect once the phone has been still
+  for 0.8 seconds, the time allowed for a second shake.
+* Shake it twice (shake, stop, shake): turn off (one long buzz), as soon as the second shake
+  is felt. The timer stops and the
   matrix goes dark. App mode disarms; the toy starts again the next time the phone is placed
   face down.
 
@@ -70,16 +71,16 @@ slow accelerometer under a wake lock.
 | Class | Job |
 | --- | --- |
 | `StopwatchController` | The rules: face down, lift, one shake and two shakes. Pure Kotlin. |
-| `ShakeCounter` | Tells one shake from two with a 1.5 second window. Pure Kotlin. |
+| `ShakeGestures` | Counts shakes until the phone has been still for 0.8 s, so one shake is told from two however long each lasts. Pure Kotlin. |
 | `TimerSession` | Runs the sensors in stages (see Battery), applies the rules, and redraws each second on the toy's matrix when it is showing, otherwise on the app's. |
 | `StopwatchToy` | Glyph Toy service. Hands its matrix to the session while the system shows it. A Glyph Button long press pauses on phones that have one. |
 | `TimerService` | App mode foreground service that keeps the session watching while armed. |
 | `MotionSensors` + `FlipFilter` | Face down = accelerometer z below -9.0 m/s² for 500 ms with the proximity sensor near. Face up = z above -6.0 m/s² for 500 ms. |
-| `ShakeFilter` | A low pass filter removes gravity. A shake is 3 samples within 500 ms above 4 m/s² of movement face down on the table, or above 10 m/s² in the hand. The next shake counts only after 0.3 s of calm, so one long shake is one shake. Placing the phone down is ignored for 1 s, and the first 0.3 s after a lift. |
+| `ShakeFilter` | A low pass filter removes gravity. A shake is 3 samples within 500 ms above 4 m/s² of movement face down on the table, or above 10 m/s² in the hand. The next shake counts only after 0.2 s of calm, so one long shake is one shake. Placing the phone down is ignored for 1 s, and the first 0.3 s after a lift. |
 | `GlyphRenderer` + `MatrixDigits` | Draws the minutes with a 3 x 7 pixel font and the minute bar, and sends the frame to the toy's or the app's matrix. |
 | `Stopwatch` | Pure state machine: IDLE, RUNNING, PAUSED. |
 
-`Stopwatch`, `StopwatchController`, `ShakeCounter`, `ShakeFilter`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
+`Stopwatch`, `StopwatchController`, `ShakeGestures`, `ShakeFilter`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
 are covered by unit tests in `app/src/test`.
 
 ## Still to do

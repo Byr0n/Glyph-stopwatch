@@ -24,8 +24,7 @@ class TimerSession private constructor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private val controller = StopwatchController()
     private val flips = FlipFilter()
-    private val shakes = ShakeFilter()
-    private val shakeCounter = ShakeCounter()
+    private val shakes = ShakeGestures()
     private val sensors = MotionSensors(context, ::onAcceleration, ::onProximity)
     private val wakeLock = context.getSystemService(PowerManager::class.java)
         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:session")
@@ -61,10 +60,6 @@ class TimerSession private constructor(private val context: Context) {
                 TimerState.IDLE -> Unit
             }
         }
-    }
-
-    private val shakeWindowElapsed = Runnable {
-        shakeCounter.onWindowElapsed(now())?.let(::onShakes)
     }
 
     private val confirmTimeout = Runnable {
@@ -151,11 +146,7 @@ class TimerSession private constructor(private val context: Context) {
         if (!isActive) return
         val faceDown = flips.isFaceDown
         val threshold = if (faceDown) TABLE_SHAKE else HAND_SHAKE
-        if (shakes.onSample(x, y, z, now, threshold, requireFaceDown = faceDown)) {
-            handler.removeCallbacks(shakeWindowElapsed)
-            val count = shakeCounter.onShake(now)
-            if (count != null) onShakes(count) else handler.postDelayed(shakeWindowElapsed, shakeCounter.windowMs)
-        }
+        shakes.onSample(x, y, z, now, threshold, requireFaceDown = faceDown)?.let(::onShakes)
     }
 
     private fun onShakes(count: Int) {
@@ -188,9 +179,8 @@ class TimerSession private constructor(private val context: Context) {
     }
 
     private fun afterStop() {
-        handler.removeCallbacks(shakeWindowElapsed)
         handler.removeCallbacks(holdLimit)
-        shakeCounter.reset()
+        shakes.reset(now())
         updateSensors()
         redraw()
     }
