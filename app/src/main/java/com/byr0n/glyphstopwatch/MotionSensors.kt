@@ -5,36 +5,40 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.SystemClock
 
 /**
- * Watches the accelerometer, with the proximity sensor as an extra check, and reports
- * debounced face down and face up changes on the main thread.
+ * Streams accelerometer samples, plus whether the proximity sensor reads near, on the main
+ * thread. Without a proximity sensor, near is always true.
  */
-class FaceDownDetector(context: Context, private val onFlip: (Flip) -> Unit) : SensorEventListener {
+class MotionSensors(
+    context: Context,
+    private val onSample: (x: Float, y: Float, z: Float, proximityNear: Boolean) -> Unit,
+) : SensorEventListener {
     private val sensors = context.getSystemService(SensorManager::class.java)
     private val accelerometer = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val proximity = sensors.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-    private val filter = FlipFilter()
-
-    // Without a proximity sensor, rely on the accelerometer alone.
     private var proximityNear = proximity == null
 
+    var isRunning = false
+        private set
+
     fun start() {
-        filter.reset()
-        sensors.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        if (isRunning) return
+        isRunning = true
+        sensors.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
         proximity?.let { sensors.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
     }
 
     fun stop() {
+        if (!isRunning) return
+        isRunning = false
         sensors.unregisterListener(this)
     }
 
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_PROXIMITY -> proximityNear = event.values[0] < event.sensor.maximumRange
-            Sensor.TYPE_ACCELEROMETER ->
-                filter.onSample(event.values[2], proximityNear, SystemClock.elapsedRealtime())?.let(onFlip)
+            Sensor.TYPE_ACCELEROMETER -> onSample(event.values[0], event.values[1], event.values[2], proximityNear)
         }
     }
 

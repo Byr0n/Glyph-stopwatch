@@ -9,25 +9,19 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
-import android.os.PowerManager
 
 /**
- * Foreground service for app mode. While armed it watches for the phone being placed face
- * down and drives the shared [TimerSession], drawing through the app's Glyph Matrix access.
+ * Foreground service for app mode. While armed it keeps the shared [TimerSession] watching
+ * the phone's motion and lets it draw through the app's Glyph Matrix access.
  */
 class TimerService : Service() {
     private val session by lazy { TimerSession.get(this) }
     private lateinit var renderer: GlyphRenderer
-    private lateinit var detector: FaceDownDetector
-    private lateinit var wakeLock: PowerManager.WakeLock
 
     override fun onCreate() {
         super.onCreate()
         renderer = GlyphRenderer(this, asToy = false).also { it.start() }
         session.attachApp(renderer)
-        detector = FaceDownDetector(this, ::onFlip)
-        wakeLock = getSystemService(PowerManager::class.java)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:armed")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -36,32 +30,21 @@ class TimerService : Service() {
             return START_NOT_STICKY
         }
         startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        // The sensors need the CPU while the screen is off.
-        if (!wakeLock.isHeld) wakeLock.acquire()
-        detector.start()
+        if (!armed) session.watch()
         armed = true
         return START_STICKY
     }
 
     override fun onDestroy() {
+        if (armed) session.unwatch()
         armed = false
-        detector.stop()
-        session.stop(showFinal = false)
+        session.stop()
         session.detachApp(renderer)
         renderer.release()
-        if (wakeLock.isHeld) wakeLock.release()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun onFlip(flip: Flip) {
-        when (flip) {
-            Flip.FACE_DOWN -> session.start()
-            // Picking the phone up resets the timer; show the final time briefly first.
-            Flip.FACE_UP -> session.stop(showFinal = true)
-        }
-    }
 
     private fun buildNotification(): Notification {
         val manager = getSystemService(NotificationManager::class.java)

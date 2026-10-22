@@ -3,16 +3,15 @@ package com.byr0n.glyphstopwatch
 import kotlin.math.sqrt
 
 /**
- * Spots a shake from raw accelerometer samples while the phone lies face down.
+ * Spots a shake from raw accelerometer samples.
  *
  * A low pass filter tracks gravity; what is left over is the phone's own movement. A shake
- * is at least [minSamples] samples with movement above [threshold] within [windowMs], while
- * gravity still says face down. Single knocks on the table are too short to count, and a
- * phone being picked up turns over, so neither reads as a shake. After a shake, or after
- * [reset], nothing counts for [cooldownMs].
+ * is at least [minSamples] samples with movement above a threshold within [windowMs].
+ * Single knocks on the table are too short to count. With `requireFaceDown`, samples only
+ * count while gravity still says face down, so a phone being picked up never reads as a
+ * shake. After a shake, or after [reset], nothing counts for a quiet period.
  */
 class ShakeFilter(
-    private val threshold: Float = 4.0f,
     private val minSamples: Int = 3,
     private val windowMs: Long = 500L,
     private val cooldownMs: Long = 1_000L,
@@ -23,7 +22,7 @@ class ShakeFilter(
     private var quietUntilMs = 0L
 
     /** Returns true when this sample completes a shake. */
-    fun onSample(x: Float, y: Float, z: Float, nowMs: Long): Boolean {
+    fun onSample(x: Float, y: Float, z: Float, nowMs: Long, threshold: Float, requireFaceDown: Boolean): Boolean {
         val sample = floatArrayOf(x, y, z)
         var movement = 0f
         for (i in 0..2) {
@@ -31,7 +30,7 @@ class ShakeFilter(
             val linear = sample[i] - gravity[i]
             movement += linear * linear
         }
-        if (nowMs < quietUntilMs || gravity[2] > faceDownGravityZ) {
+        if (nowMs < quietUntilMs || (requireFaceDown && gravity[2] > faceDownGravityZ)) {
             hits.clear()
             return false
         }
@@ -43,13 +42,10 @@ class ShakeFilter(
         return true
     }
 
-    /** Starts a cooldown, e.g. so setting the phone down is not taken as a shake. */
-    fun reset(nowMs: Long) {
+    /** Ignores movement for [quietMs], e.g. so setting the phone down is not taken as a shake. */
+    fun reset(nowMs: Long, quietMs: Long = cooldownMs) {
         hits.clear()
-        gravity[0] = 0f
-        gravity[1] = 0f
-        gravity[2] = -GRAVITY
-        quietUntilMs = nowMs + cooldownMs
+        quietUntilMs = nowMs + quietMs
     }
 
     private companion object {

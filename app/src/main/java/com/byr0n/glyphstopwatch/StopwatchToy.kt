@@ -7,23 +7,17 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
-import android.os.PowerManager
 import com.nothing.ketchum.GlyphToy
 
 /**
- * Glyph Toy mode. The system can show the toy at times other than a flip (when it is
- * chosen, or when the screen turns off), so being shown does not mean face down. While
- * shown, the toy runs the same [FaceDownDetector] as app mode and only starts the
- * stopwatch once the phone really is face down. Shakes pause and restart it through
- * [TimerSession].
+ * Glyph Toy mode. While the system shows the toy, the shared [TimerSession] watches the
+ * phone's motion and draws on the toy's matrix. Being shown does not mean face down (the
+ * system also shows the toy when it is chosen or the screen turns off), so the session
+ * starts the stopwatch only once the phone really is face down.
  */
 class StopwatchToy : Service() {
     private val session by lazy { TimerSession.get(this) }
     private var renderer: GlyphRenderer? = null
-    private var detector: FaceDownDetector? = null
-    private val wakeLock by lazy {
-        getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:toy")
-    }
 
     private val messenger = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
@@ -41,22 +35,14 @@ class StopwatchToy : Service() {
         val toyRenderer = GlyphRenderer(this, asToy = true).also { it.start() }
         renderer = toyRenderer
         session.attachToy(toyRenderer)
-        // The sensors need the CPU while the screen is off.
-        if (!wakeLock.isHeld) wakeLock.acquire()
-        detector = FaceDownDetector(this) { flip ->
-            when (flip) {
-                Flip.FACE_DOWN -> session.start()
-                Flip.FACE_UP -> session.stop(showFinal = true)
-            }
-        }.also { it.start() }
+        session.watch()
         return messenger.binder
     }
 
+    // A lift hides the toy, but the session keeps the stopwatch going until it decides
+    // whether the lift was a hold or a stop.
     override fun onUnbind(intent: Intent?): Boolean {
-        detector?.stop()
-        detector = null
-        if (wakeLock.isHeld) wakeLock.release()
-        session.stop(showFinal = true)
+        session.unwatch()
         renderer?.let {
             session.detachToy(it)
             it.release()
