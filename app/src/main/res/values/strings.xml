@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Glyph Stopwatch</string>
-    <string name="intro">Add the Stopwatch toy and set it as the always-on Glyph Toy, or arm the timer here. Then place the phone face down to start it. Shake it while face down to pause; shake again to restart from zero. Pick the phone up to stop.</string>
+    <string name="intro">Add the Stopwatch toy and set it as the always-on Glyph Toy, or arm the timer here. Then place the phone face down to start it. Shake it while face down to pause; shake again to restart from zero. Press volume down twice to turn it off. Pick the phone up to stop.</string>
     <string name="arm">Arm timer</string>
     <string name="disarm">Disarm</string>
     <string name="battery">Exempt from battery optimisation</string>
