@@ -16,15 +16,13 @@ import android.os.VibratorManager
  * To save battery the sensors run in stages. With the stopwatch off, only the proximity
  * sensor listens and the processor can sleep. When something covers the phone, the
  * accelerometer checks for [CONFIRM_MS] whether it really is face down. While the stopwatch
- * is on (running, or paused by a lift), the accelerometer runs at 25 Hz under a wake lock;
- * after a lift the toy is hidden, but the session still has to catch shakes and the phone
- * being placed back down.
+ * runs, the accelerometer runs at 25 Hz under a wake lock, watching for a lift or a shake.
  */
 class TimerSession private constructor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private val controller = StopwatchController()
     private val flips = FlipFilter()
-    private val shakes = ShakeGestures()
+    private val shakes = ShakeFilter()
     private val sensors = MotionSensors(context, ::onAcceleration, ::onProximity)
     private val wakeLock = context.getSystemService(PowerManager::class.java)
         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:session")
@@ -65,10 +63,6 @@ class TimerSession private constructor(private val context: Context) {
     private val confirmTimeout = Runnable {
         confirming = false
         updateSensors()
-    }
-
-    private val holdLimit = Runnable {
-        if (controller.isHeld) stop()
     }
 
     /** Starts watching for the phone being placed face down, for as long as the caller needs. */
@@ -143,43 +137,34 @@ class TimerSession private constructor(private val context: Context) {
             Flip.FACE_UP -> onFaceUp(now)
             null -> Unit
         }
-        if (!isActive) return
-        val faceDown = flips.isFaceDown
-        val threshold = if (faceDown) TABLE_SHAKE else HAND_SHAKE
-        shakes.onSample(x, y, z, now, threshold, requireFaceDown = faceDown)?.let(::onShakes)
+        if (isActive && flips.isFaceDown && shakes.onSample(x, y, z, now, SHAKE, requireFaceDown = true)) onShake()
     }
 
-    private fun onShakes(count: Int) {
-        val result = controller.onShakes(count, now())
-        feedback(result)
-        if (isActive) return redraw()
+    private fun onShake() {
+        feedback(controller.onShake(now()))
         afterStop()
-        // Two shakes turn everything off, so app mode disarms too.
-        if (result == Feedback.LONG && TimerService.armed) TimerService.disarm(context)
+        // A shake turns everything off, so app mode disarms too.
+        if (TimerService.armed) TimerService.disarm(context)
     }
 
     private fun onFaceDown(now: Long) {
         handler.removeCallbacks(confirmTimeout)
-        handler.removeCallbacks(holdLimit)
         confirming = false
         // Setting the phone down is not a shake.
         shakes.reset(now)
-        feedback(controller.onFaceDown(now))
+        controller.onFaceDown(now)
         updateSensors()
         redraw()
     }
 
     private fun onFaceUp(now: Long) {
-        feedback(controller.onFaceUp(now))
         if (!isActive) return
-        // Let the pick up settle before shakes count.
-        shakes.reset(now, LIFT_QUIET_MS)
-        handler.postDelayed(holdLimit, HOLD_LIMIT_MS)
-        redraw()
+        // Lifting stops and resets; putting it back down starts again.
+        controller.onFaceUp(now)
+        afterStop()
     }
 
     private fun afterStop() {
-        handler.removeCallbacks(holdLimit)
         shakes.reset(now())
         updateSensors()
         redraw()
@@ -203,7 +188,6 @@ class TimerSession private constructor(private val context: Context) {
         val effect = when (feedback) {
             Feedback.NONE -> return
             Feedback.SHORT -> VibrationEffect.createOneShot(BUZZ_MS, VibrationEffect.DEFAULT_AMPLITUDE)
-            Feedback.DOUBLE -> VibrationEffect.createWaveform(longArrayOf(0, BUZZ_MS, 80, BUZZ_MS), -1)
             Feedback.LONG -> VibrationEffect.createOneShot(LONG_BUZZ_MS, VibrationEffect.DEFAULT_AMPLITUDE)
         }
         context.getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
@@ -216,13 +200,8 @@ class TimerSession private constructor(private val context: Context) {
         private const val BUZZ_MS = 40L
         private const val LONG_BUZZ_MS = 300L
         private const val CONFIRM_MS = 2_000L
-        private const val LIFT_QUIET_MS = 300L
-        private const val HOLD_LIMIT_MS = 10 * 60_000L
-
-        // Movement in m/s² that counts toward a shake: a jiggle on the table, or a firm
-        // shake in the hand, well above the movement of simply holding the phone.
-        private const val TABLE_SHAKE = 4.0f
-        private const val HAND_SHAKE = 10.0f
+        // Movement in m/s² that counts toward a shake of the phone lying face down.
+        private const val SHAKE = 4.0f
 
         @Volatile
         private var instance: TimerSession? = null

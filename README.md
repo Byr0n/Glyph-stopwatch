@@ -2,21 +2,15 @@
 
 A stopwatch for the Nothing Phone (4a) Pro that shows on the Glyph Matrix.
 
-* Place the phone face down: the stopwatch starts.
-* Lift it: pause (one short buzz). Place it back down: it carries on from there (one short buzz).
-  A pause in the hand ends on its own after 10 minutes.
-* Shake it once: reset to 00 (two quick buzzes). Face down it keeps counting; in the hand it
-  waits at 00 until placed down. A single shake takes effect once the phone has been still
-  for 0.8 seconds, the time allowed for a second shake.
-* Shake it twice (shake, stop, shake): turn off (one long buzz), as soon as the second shake
-  is felt. The timer stops and the
-  matrix goes dark. App mode disarms; the toy starts again the next time the phone is placed
-  face down.
+* Place the phone face down: the stopwatch starts from 00.
+* Lift it: the stopwatch stops and resets. Place it back down: it starts again from 00.
+* Shake it while face down: turn off (one long buzz). The matrix goes dark and stays dark
+  until the phone is next lifted and put down. App mode disarms.
 
 The display shows the minutes as two centred digits, 00 to 99. To their right a bar fills
 from the bottom over each minute, one pixel about every 6.7 seconds with the next pixel fading
 in, so it moves every second; when it reaches the top the minutes tick over and it starts
-again. While paused the display flashes.
+again.
 
 The 4a Pro matrix is a 13 x 13 grid with 137 LEDs in a circle (the corners have none). The
 3 x 7 digits use rows 3 to 9 and columns 2 to 8, and the 9 pixel bar column 11, rows 2 to 10,
@@ -35,10 +29,8 @@ the system shows through Flip to Glyph. The system can also show the toy at othe
 while it is shown the toy checks the accelerometer itself: the stopwatch starts only once the
 phone has been face down for 500 ms. No need to arm anything.
 
-On the table, a jiggle counts as a shake; the detector ignores movement once the phone starts
-to turn over, so picking it up is never taken as one. In the hand it takes a firm shake, well
-above the movement of simply holding the phone. A lift hides the toy, but the app keeps
-watching the motion sensor while the timer is paused.
+A jiggle of the phone on the table counts as a shake; the detector ignores movement once
+the phone starts to turn over, so picking it up is never taken as one.
 
 **App mode.** Arm the timer in the app. It watches the accelerometer itself and draws with the
 app's own Glyph Matrix access. Use this if you would rather keep Flip to Glyph off.
@@ -51,8 +43,8 @@ showing it draws the time, because the system puts toys above apps on the matrix
 With the timer off, the app only listens to the proximity sensor, which on most phones wakes
 the processor by itself when something covers it. So the processor sleeps until the phone is
 placed face down; then the accelerometer checks for up to 2 seconds. While the timer is on,
-the accelerometer runs at 25 Hz and a wake lock keeps the processor awake for the per second
-redraw. Phones whose proximity and accelerometer cannot wake the processor fall back to a
+the accelerometer runs at 25 Hz, watching for a lift or a shake, and a wake lock keeps the
+processor awake for the per second redraw. Phones whose proximity and accelerometer cannot wake the processor fall back to a
 slow accelerometer under a wake lock.
 
 ## Setup on the phone
@@ -70,17 +62,16 @@ slow accelerometer under a wake lock.
 
 | Class | Job |
 | --- | --- |
-| `StopwatchController` | The rules: face down, lift, one shake and two shakes. Pure Kotlin. |
-| `ShakeGestures` | Counts shakes until the phone has been still for 0.8 s, so one shake is told from two however long each lasts. Pure Kotlin. |
+| `StopwatchController` | The rules: face down starts, lift resets, a shake turns off. Pure Kotlin. |
 | `TimerSession` | Runs the sensors in stages (see Battery), applies the rules, and redraws each second on the toy's matrix when it is showing, otherwise on the app's. |
-| `StopwatchToy` | Glyph Toy service. Hands its matrix to the session while the system shows it. A Glyph Button long press pauses on phones that have one. |
+| `StopwatchToy` | Glyph Toy service. Hands its matrix to the session while the system shows it. On phones with a Glyph Button, a long press pauses, and the paused time flashes. |
 | `TimerService` | App mode foreground service that keeps the session watching while armed. |
 | `MotionSensors` + `FlipFilter` | Face down = accelerometer z below -9.0 m/s² for 500 ms with the proximity sensor near. Face up = z above -6.0 m/s² for 500 ms. |
-| `ShakeFilter` | A low pass filter removes gravity. A shake is 3 samples within 500 ms above 4 m/s² of movement face down on the table, or above 10 m/s² in the hand. The next shake counts only after 0.2 s of calm, so one long shake is one shake. Placing the phone down is ignored for 1 s, and the first 0.3 s after a lift. |
+| `ShakeFilter` | A low pass filter removes gravity. A shake is 3 samples within 500 ms above 4 m/s² of movement while the phone lies face down. Placing the phone down is ignored for 1 s. |
 | `GlyphRenderer` + `MatrixDigits` | Draws the minutes with a 3 x 7 pixel font and the minute bar, and sends the frame to the toy's or the app's matrix. |
 | `Stopwatch` | Pure state machine: IDLE, RUNNING, PAUSED. |
 
-`Stopwatch`, `StopwatchController`, `ShakeGestures`, `ShakeFilter`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
+`Stopwatch`, `StopwatchController`, `ShakeFilter`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
 are covered by unit tests in `app/src/test`.
 
 ## Still to do
