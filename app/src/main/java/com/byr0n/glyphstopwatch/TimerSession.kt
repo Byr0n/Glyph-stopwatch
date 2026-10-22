@@ -16,11 +16,12 @@ import android.os.VibratorManager
  * To save battery the sensors run in stages. With the stopwatch off, only the proximity
  * sensor listens and the processor can sleep. When something covers the phone, the
  * accelerometer checks for [CONFIRM_MS] whether it really is face down. While the stopwatch
- * runs, the accelerometer runs at 25 Hz under a wake lock, watching for a lift or a shake.
+ * runs, and for 5 seconds after a lift, the accelerometer runs at 25 Hz under a wake lock,
+ * watching for a lift or a shake.
  */
 class TimerSession private constructor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
-    private val controller = StopwatchController()
+    private val controller = StopwatchController(LISTEN_AFTER_LIFT_MS)
     private val flips = FlipFilter()
     private val shakes = ShakeFilter()
     private val sensors = MotionSensors(context, ::onAcceleration, ::onProximity)
@@ -64,6 +65,8 @@ class TimerSession private constructor(private val context: Context) {
         confirming = false
         updateSensors()
     }
+
+    private val stopListening = Runnable { updateSensors() }
 
     /** Starts watching for the phone being placed face down, for as long as the caller needs. */
     fun watch() {
@@ -137,14 +140,17 @@ class TimerSession private constructor(private val context: Context) {
             Flip.FACE_UP -> onFaceUp(now)
             null -> Unit
         }
-        if (isActive && flips.isFaceDown && shakes.onSample(x, y, z, now, SHAKE, requireFaceDown = true)) onShake()
+        val shaken = when {
+            isActive && flips.isFaceDown -> shakes.onSample(x, y, z, now, TABLE_SHAKE, requireFaceDown = true)
+            controller.isListeningAfterLift(now) -> shakes.onSample(x, y, z, now, HAND_SHAKE, requireFaceDown = false)
+            else -> false
+        }
+        if (shaken) onShake()
     }
 
     private fun onShake() {
         feedback(controller.onShake(now()))
         afterStop()
-        // A shake turns everything off, so app mode disarms too.
-        if (TimerService.armed) TimerService.disarm(context)
     }
 
     private fun onFaceDown(now: Long) {
@@ -159,20 +165,24 @@ class TimerSession private constructor(private val context: Context) {
 
     private fun onFaceUp(now: Long) {
         if (!isActive) return
-        // Lifting stops and resets; putting it back down starts again.
+        // Lifting stops and resets; putting it back down starts again. For a few seconds a
+        // shake in the hand still turns it off.
         controller.onFaceUp(now)
-        afterStop()
+        afterStop(quietMs = LIFT_QUIET_MS)
+        handler.removeCallbacks(stopListening)
+        handler.postDelayed(stopListening, LISTEN_AFTER_LIFT_MS + 50)
     }
 
-    private fun afterStop() {
-        shakes.reset(now())
+    // Ignores movement briefly, so the move that caused the stop is not taken as a shake.
+    private fun afterStop(quietMs: Long = 1_000L) {
+        shakes.reset(now(), quietMs)
         updateSensors()
         redraw()
     }
 
     private fun updateSensors() {
         val mode = when {
-            isActive || confirming -> MotionSensors.Mode.WATCH
+            isActive || confirming || controller.isListeningAfterLift(now()) -> MotionSensors.Mode.WATCH
             watchers > 0 -> MotionSensors.Mode.WAIT_FOR_COVER
             else -> MotionSensors.Mode.OFF
         }
@@ -200,8 +210,13 @@ class TimerSession private constructor(private val context: Context) {
         private const val BUZZ_MS = 40L
         private const val LONG_BUZZ_MS = 300L
         private const val CONFIRM_MS = 2_000L
-        // Movement in m/s² that counts toward a shake of the phone lying face down.
-        private const val SHAKE = 4.0f
+        private const val LIFT_QUIET_MS = 300L
+        private const val LISTEN_AFTER_LIFT_MS = 5_000L
+
+        // Movement in m/s² that counts toward a shake: a jiggle face down, or a firm shake in
+        // the hand, well above the movement of turning the phone over to look at it.
+        private const val TABLE_SHAKE = 4.0f
+        private const val HAND_SHAKE = 10.0f
 
         @Volatile
         private var instance: TimerSession? = null

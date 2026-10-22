@@ -1,6 +1,8 @@
 package com.byr0n.glyphstopwatch
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StopwatchControllerTest {
@@ -34,6 +36,34 @@ class StopwatchControllerTest {
     fun shakeWhileOffDoesNothing() {
         assertEquals(Feedback.NONE, c.onShake(0))
         assertEquals(TimerState.IDLE, c.state)
+    }
+
+    @Test
+    fun shakeInTheHandSoonAfterALiftTurnsOff() {
+        c.onFaceDown(0)
+        c.onFaceUp(60_000)
+        assertTrue(c.isListeningAfterLift(64_000))
+        assertEquals(Feedback.LONG, c.onShake(64_000))
+        assertFalse(c.isListeningAfterLift(64_500))
+        assertEquals(Feedback.NONE, c.onShake(64_500))
+    }
+
+    @Test
+    fun shakeLongAfterALiftDoesNothing() {
+        c.onFaceDown(0)
+        c.onFaceUp(60_000)
+        assertFalse(c.isListeningAfterLift(65_001))
+        assertEquals(Feedback.NONE, c.onShake(65_001))
+    }
+
+    @Test
+    fun placingDownAfterAShakeOffStartsAgain() {
+        c.onFaceDown(0)
+        c.onFaceUp(60_000)
+        c.onShake(61_000)
+        c.onFaceDown(70_000)
+        assertEquals(TimerState.RUNNING, c.state)
+        assertEquals(1_000, c.elapsed(71_000))
     }
 
     @Test
