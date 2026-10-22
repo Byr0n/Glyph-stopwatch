@@ -50,7 +50,9 @@ showing it draws the time, because the system puts toys above apps on the matrix
 | `StopwatchToy` | Glyph Toy service. Starts the stopwatch when the system shows it, stops it when hidden. A Glyph Button long press pauses on phones that have one. |
 | `TimerService` | App mode foreground service holding a partial wake lock while armed, so the face down sensors keep working. |
 | `FaceDownDetector` + `FlipFilter` | Face down = accelerometer z below -9.0 m/s² for 500 ms with the proximity sensor near. Face up = z above -6.0 m/s² for 500 ms. |
-| `VolumeKeyService` + `PressClassifier` | Accessibility service that takes over volume down only while the timer is running or paused, and splits single from double presses with a 400 ms window. |
+| `VolumeKeyService` | Accessibility service that takes over volume down while the timer is running or paused and the screen is on. |
+| Media session in `TimerSession` | Android does not pass volume keys to accessibility services with the screen off, so while the timer is active a media session with remote volume takes them. Volume up does nothing during that time. |
+| `PressClassifier` | Splits single from double presses with a 400 ms window, for presses from either path. |
 | `GlyphRenderer` + `MatrixDigits` | Draws the digits with a 3 x 5 pixel font and sends them with `setAppMatrixFrame`. |
 | `Stopwatch` | Pure state machine: IDLE, RUNNING, PAUSED. |
 
@@ -62,6 +64,5 @@ are covered by unit tests in `app/src/test`.
 * Test on the phone with the screen off and tune the thresholds in `FlipFilter` and `PressClassifier`.
 * Check how often the system lets an always on toy redraw. The toy draws every second, but if
   the phone only refreshes it on the once a minute AOD event, the seconds will not show.
-* If the accessibility service misses volume keys with the screen off, add the fallback from the
-  spec: a `MediaSession` with a silent track and a `VolumeProviderCompat`, so presses arrive in
-  `onAdjustVolume`.
+* If volume presses still do not arrive with the screen off, the media session may also need a
+  silent audio track playing, as the spec suggests.
