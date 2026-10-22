@@ -18,7 +18,7 @@ in, so it moves every second; when it reaches the top the minutes tick over and 
 again. While paused the display flashes.
 
 The 4a Pro matrix is a 13 x 13 grid with 137 LEDs in a circle (the corners have none). The
-3 x 7 digits use rows 3 to 9 and columns 3 to 9, and the 9 pixel bar column 11, rows 2 to 10,
+3 x 7 digits use rows 3 to 9 and columns 2 to 8, and the 9 pixel bar column 11, rows 2 to 10,
 all inside the circle.
 
 ## Build

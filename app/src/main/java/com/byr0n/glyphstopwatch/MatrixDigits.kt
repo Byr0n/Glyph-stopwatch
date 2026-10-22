@@ -7,8 +7,9 @@ import kotlin.math.floor
  * the minutes as two centred digits, and to their right a bar that fills from the bottom
  * over each minute. When the bar reaches the top the minutes tick over and it starts again.
  *
- * On the 13x13 Phone (4a) Pro matrix the digits take rows 3 to 9 and columns 3 to 9, and
- * the bar column 11, rows 2 to 10: the full height the circle of LEDs allows there.
+ * On the 13x13 Phone (4a) Pro matrix the digits take rows 3 to 9 and columns 2 to 8, one
+ * left of centre, and the bar column 11, rows 2 to 10: the full height the circle of LEDs
+ * allows there.
  */
 object MatrixDigits {
     private const val W = 3
@@ -38,7 +39,7 @@ object MatrixDigits {
     fun render(elapsedMs: Long, size: Int, brightness: Int = 255): IntArray {
         val pixels = IntArray(size * size)
         val centre = size / 2
-        drawNumber(pixels, size, minutes(elapsedMs), centre - W, centre - H / 2, brightness)
+        drawNumber(pixels, size, minutes(elapsedMs), centre - W - 1, centre - H / 2, brightness)
         drawBar(pixels, size, barFill(elapsedMs), centre + W + 2, centre + BAR_LENGTH / 2, brightness)
         return pixels
     }
