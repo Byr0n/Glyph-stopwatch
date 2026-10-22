@@ -19,6 +19,16 @@ android {
         versionName = "0.2.0"
     }
 
+    // One shared debug key, so every build (local or GitHub Actions) can update the last one.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
