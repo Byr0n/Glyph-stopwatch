@@ -14,8 +14,9 @@ android {
         // The special use foreground service type needs Android 14; Glyph Matrix phones ship newer.
         minSdk = 34
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // GitHub Actions numbers each build, so the app can show which one is installed.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toInt() ?: 1
+        versionName = "0.2.0"
     }
 
     buildTypes {

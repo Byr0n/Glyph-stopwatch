@@ -84,6 +84,7 @@ class MainActivity : Activity() {
             R.string.status,
             getString(if (TimerService.armed) R.string.yes else R.string.no),
             getString(if (batteryExempt) R.string.yes else R.string.no),
+            packageManager.getPackageInfo(packageName, 0).let { "${it.versionName} (build ${it.longVersionCode})" },
         )
     }
 
