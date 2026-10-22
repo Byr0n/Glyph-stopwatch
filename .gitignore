@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.cxx/
+# Nothing's Glyph Matrix SDK may not be redistributed; the build downloads it.
+app/libs/*.aar
