@@ -1,9 +1,6 @@
 package com.byr0n.glyphstopwatch
 
 import android.content.Context
-import android.media.VolumeProvider
-import android.media.session.MediaSession
-import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -17,8 +14,7 @@ import android.os.VibratorManager
  * the app's. Call everything on the main thread.
  *
  * While it is active a shake of the face down phone pauses it, and another shake restarts
- * it from zero. A double press of volume down turns everything off. The volume keys reach it
- * through a media session with remote volume, which Android also feeds with the screen off.
+ * it from zero.
  */
 class TimerSession private constructor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
@@ -26,9 +22,6 @@ class TimerSession private constructor(private val context: Context) {
     private val wakeLock = context.getSystemService(PowerManager::class.java)
         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:session")
     private val shakes = ShakeDetector(context, ::onShake)
-    private val classifier = PressClassifier()
-    private val windowElapsed = Runnable { classifier.onWindowElapsed(SystemClock.uptimeMillis()) }
-    private var mediaSession: MediaSession? = null
     private var blinkOn = true
     private var finalTimeMs: Long? = null
 
@@ -94,7 +87,6 @@ class TimerSession private constructor(private val context: Context) {
         stopwatch.start(SystemClock.elapsedRealtime())
         if (!wakeLock.isHeld) wakeLock.acquire()
         shakes.start()
-        captureVolumeKeys()
         redraw()
     }
 
@@ -105,7 +97,6 @@ class TimerSession private constructor(private val context: Context) {
         val finalMs = stopwatch.stop(SystemClock.elapsedRealtime())
         if (wakeLock.isHeld) wakeLock.release()
         shakes.stop()
-        releaseVolumeKeys()
         if (showFinal) {
             finalTimeMs = finalMs
             handler.postDelayed(hideFinalTime, FINAL_TIME_MS)
@@ -136,42 +127,6 @@ class TimerSession private constructor(private val context: Context) {
         }
     }
 
-    private fun onVolumeDownPressed() {
-        handler.removeCallbacks(windowElapsed)
-        // A single press does nothing; only a double press counts.
-        if (classifier.onPress(SystemClock.uptimeMillis()) == Press.DOUBLE) turnOff()
-        else handler.postDelayed(windowElapsed, classifier.windowMs)
-    }
-
-    /** Stops the timer with the matrix off, and disarms app mode. */
-    private fun turnOff() {
-        vibrate(VibrationEffect.createOneShot(TURN_OFF_BUZZ_MS, VibrationEffect.DEFAULT_AMPLITUDE))
-        stop(showFinal = false)
-        if (TimerService.armed) TimerService.disarm(context)
-    }
-
-    private fun captureVolumeKeys() {
-        if (mediaSession != null) return
-        val volume = object : VolumeProvider(VolumeProvider.VOLUME_CONTROL_RELATIVE, VOLUME_MAX, VOLUME_MAX / 2) {
-            override fun onAdjustVolume(direction: Int) {
-                if (direction < 0) onVolumeDownPressed()
-            }
-        }
-        mediaSession = MediaSession(context, "GlyphStopwatch").apply {
-            setPlaybackToRemote(volume)
-            // Android only sends volume keys to a session that reports it is playing.
-            setPlaybackState(PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1f).build())
-            isActive = true
-        }
-    }
-
-    private fun releaseVolumeKeys() {
-        handler.removeCallbacks(windowElapsed)
-        classifier.reset()
-        mediaSession?.release()
-        mediaSession = null
-    }
-
     /** Draws the current state on whichever matrix output is active. */
     fun redraw() {
         handler.removeCallbacks(tick)
@@ -193,8 +148,6 @@ class TimerSession private constructor(private val context: Context) {
         private const val BLINK_MS = 500L
         private const val FINAL_TIME_MS = 5_000L
         private const val BUZZ_MS = 40L
-        private const val TURN_OFF_BUZZ_MS = 300L
-        private const val VOLUME_MAX = 100
 
         @Volatile
         private var instance: TimerSession? = null
