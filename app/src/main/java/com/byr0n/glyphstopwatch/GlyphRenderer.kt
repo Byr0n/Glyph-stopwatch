@@ -42,10 +42,6 @@ class GlyphRenderer(context: Context, private val asToy: Boolean) {
         send(MatrixDigits.render(elapsedMs, size, brightness))
     }
 
-    fun showPair(top: Int, bottom: Int) {
-        send(MatrixDigits.renderPair(top, bottom, size))
-    }
-
     fun blank() {
         send(IntArray(size * size))
     }

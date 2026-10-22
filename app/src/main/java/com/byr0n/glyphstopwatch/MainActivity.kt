@@ -50,7 +50,8 @@ class MainActivity : Activity() {
             if (testRenderer == null) {
                 testRenderer = GlyphRenderer(this, asToy = false).also {
                     it.start()
-                    it.showPair(12, 34)
+                    // 12 minutes 30 seconds: half a bar.
+                    it.showElapsed((12 * 60 + 30) * 1000L)
                 }
             } else {
                 stopTestPattern()

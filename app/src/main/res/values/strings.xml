@@ -9,7 +9,7 @@
     <string name="toys_unavailable">Glyph Toys manager not found. Update the phone\'s system software.</string>
     <string name="toy_name">Stopwatch</string>
     <string name="toy_summary">Counts up while the phone is face down. Shake to pause; shake again to restart.</string>
-    <string name="test_pattern">Show test pattern 12:34</string>
+    <string name="test_pattern">Show test pattern</string>
     <string name="test_pattern_off">Hide test pattern</string>
     <string name="status">Armed: %1$s\nBattery exempt: %2$s\nVersion: %3$s</string>
     <string name="yes">yes</string>

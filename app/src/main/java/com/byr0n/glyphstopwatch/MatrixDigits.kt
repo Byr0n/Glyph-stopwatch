@@ -1,53 +1,45 @@
 package com.byr0n.glyphstopwatch
 
+import kotlin.math.floor
+
 /**
- * Draws elapsed time as brightness values (0 to 255) for a square Glyph Matrix,
- * row major. A 13x13 matrix cannot fit "mm:ss" on one line, so minutes sit above
- * seconds. From 100 minutes on it shows hours above minutes instead.
+ * Draws elapsed time as brightness values (0 to 255) for a square Glyph Matrix, row major:
+ * the minutes as two centred digits, and to their right a bar that fills from the bottom
+ * over each minute. When the bar reaches the top the minutes tick over and it starts again.
+ *
+ * On the 13x13 Phone (4a) Pro matrix the digits take rows 3 to 9 and columns 3 to 9, and
+ * the bar column 11, rows 2 to 10: the full height the circle of LEDs allows there.
  */
 object MatrixDigits {
     private const val W = 3
-    private const val H = 5
+    private const val H = 7
+    const val BAR_LENGTH = 9
 
-    // 3x5 font, one string per row, '#' = lit.
+    // 3x7 font, one string per row, '#' = lit.
     private val FONT = arrayOf(
-        arrayOf("###", "#.#", "#.#", "#.#", "###"),
-        arrayOf(".#.", "##.", ".#.", ".#.", "###"),
-        arrayOf("###", "..#", "###", "#..", "###"),
-        arrayOf("###", "..#", "###", "..#", "###"),
-        arrayOf("#.#", "#.#", "###", "..#", "..#"),
-        arrayOf("###", "#..", "###", "..#", "###"),
-        arrayOf("###", "#..", "###", "#.#", "###"),
-        arrayOf("###", "..#", ".#.", ".#.", ".#."),
-        arrayOf("###", "#.#", "###", "#.#", "###"),
-        arrayOf("###", "#.#", "###", "..#", "###"),
+        arrayOf("###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"),
+        arrayOf(".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"),
+        arrayOf("###", "..#", "..#", "###", "#..", "#..", "###"),
+        arrayOf("###", "..#", "..#", "###", "..#", "..#", "###"),
+        arrayOf("#.#", "#.#", "#.#", "###", "..#", "..#", "..#"),
+        arrayOf("###", "#..", "#..", "###", "..#", "..#", "###"),
+        arrayOf("###", "#..", "#..", "###", "#.#", "#.#", "###"),
+        arrayOf("###", "..#", "..#", "..#", "..#", "..#", "..#"),
+        arrayOf("###", "#.#", "#.#", "###", "#.#", "#.#", "###"),
+        arrayOf("###", "#.#", "#.#", "###", "..#", "..#", "###"),
     )
 
-    /** Splits elapsed time into the two numbers shown, top and bottom. */
-    fun split(elapsedMs: Long): Pair<Int, Int> {
-        val totalSeconds = elapsedMs / 1000
-        val minutes = totalSeconds / 60
-        return if (minutes < 100) {
-            minutes.toInt() to (totalSeconds % 60).toInt()
-        } else {
-            (minutes / 60).coerceAtMost(99).toInt() to (minutes % 60).toInt()
-        }
-    }
+    /** Whole minutes shown, up to 99. */
+    fun minutes(elapsedMs: Long): Int = (elapsedMs / 60_000).coerceAtMost(99).toInt()
+
+    /** How full the bar is, from 0 (empty) to [BAR_LENGTH] (full), through the current minute. */
+    fun barFill(elapsedMs: Long): Float = (elapsedMs % 60_000) / 60_000f * BAR_LENGTH
 
     fun render(elapsedMs: Long, size: Int, brightness: Int = 255): IntArray {
-        val (top, bottom) = split(elapsedMs)
-        return renderPair(top, bottom, size, brightness)
-    }
-
-    fun renderPair(top: Int, bottom: Int, size: Int, brightness: Int = 255): IntArray {
         val pixels = IntArray(size * size)
-        // Two digits plus a one pixel gap, two rows plus a one pixel gap, centred.
-        val blockW = W * 2 + 1
-        val blockH = H * 2 + 1
-        val x0 = (size - blockW) / 2
-        val y0 = (size - blockH) / 2
-        drawNumber(pixels, size, top, x0, y0, brightness)
-        drawNumber(pixels, size, bottom, x0, y0 + H + 1, brightness)
+        val centre = size / 2
+        drawNumber(pixels, size, minutes(elapsedMs), centre - W, centre - H / 2, brightness)
+        drawBar(pixels, size, barFill(elapsedMs), centre + W + 2, centre + BAR_LENGTH / 2, brightness)
         return pixels
     }
 
@@ -60,11 +52,20 @@ object MatrixDigits {
         val glyph = FONT[digit]
         for (row in 0 until H) {
             for (col in 0 until W) {
-                if (glyph[row][col] != '#') continue
-                val px = x + col
-                val py = y + row
-                if (px in 0 until size && py in 0 until size) pixels[py * size + px] = brightness
+                if (glyph[row][col] == '#') set(pixels, size, x + col, y + row, brightness)
             }
         }
+    }
+
+    // Lit pixels from the bottom up; the next one fades in, so the bar moves every second.
+    private fun drawBar(pixels: IntArray, size: Int, fill: Float, x: Int, bottomY: Int, brightness: Int) {
+        val full = floor(fill).toInt()
+        for (i in 0 until full) set(pixels, size, x, bottomY - i, brightness)
+        val partial = ((fill - full) * brightness).toInt()
+        if (partial > 0 && full < BAR_LENGTH) set(pixels, size, x, bottomY - full, partial)
+    }
+
+    private fun set(pixels: IntArray, size: Int, x: Int, y: Int, brightness: Int) {
+        if (x in 0 until size && y in 0 until size) pixels[y * size + x] = brightness
     }
 }
