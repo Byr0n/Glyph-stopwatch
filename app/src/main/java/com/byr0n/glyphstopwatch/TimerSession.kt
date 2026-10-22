@@ -159,8 +159,12 @@ class TimerSession private constructor(private val context: Context) {
     }
 
     private fun onShakes(count: Int) {
-        feedback(controller.onShakes(count, now()))
-        if (isActive) redraw() else afterStop()
+        val result = controller.onShakes(count, now())
+        feedback(result)
+        if (isActive) return redraw()
+        afterStop()
+        // Two shakes turn everything off, so app mode disarms too.
+        if (result == Feedback.LONG && TimerService.armed) TimerService.disarm(context)
     }
 
     private fun onFaceDown(now: Long) {

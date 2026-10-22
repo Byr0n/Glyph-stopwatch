@@ -34,6 +34,12 @@ to turn over, so picking it up is never taken as one. In the hand it takes a fir
 above the movement of simply holding the phone. A lift hides the toy, but the app keeps
 watching the motion sensor while the timer is paused.
 
+**App mode.** Arm the timer in the app. It watches the accelerometer itself and draws with the
+app's own Glyph Matrix access. Use this if you would rather keep Flip to Glyph off.
+
+Both share one stopwatch, so if both are on they never run two timers. While the toy is
+showing it draws the time, because the system puts toys above apps on the matrix.
+
 ## Battery
 
 With the timer off, the app only listens to the proximity sensor, which on most phones wakes
@@ -42,12 +48,6 @@ placed face down; then the accelerometer checks for up to 2 seconds. While the t
 the accelerometer runs at 25 Hz and a wake lock keeps the processor awake for the per second
 redraw. Phones whose proximity and accelerometer cannot wake the processor fall back to a
 slow accelerometer under a wake lock.
-
-**App mode.** Arm the timer in the app. It watches the accelerometer itself and draws with the
-app's own Glyph Matrix access. Use this if you would rather keep Flip to Glyph off.
-
-Both share one stopwatch, so if both are on they never run two timers. While the toy is
-showing it draws the time, because the system puts toys above apps on the matrix.
 
 ## Setup on the phone
 
