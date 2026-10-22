@@ -59,6 +59,20 @@ class ShakeFilterTest {
     }
 
     @Test
+    fun longShakeIsOneShake() {
+        lieFaceDown(2_000)
+        assertEquals(1, jiggle(2_000, 8f))
+    }
+
+    @Test
+    fun shakeStopShakeIsTwo() {
+        lieFaceDown(2_000)
+        assertEquals(1, jiggle(400, 8f))
+        lieFaceDown(400)
+        assertEquals(1, jiggle(400, 8f))
+    }
+
+    @Test
     fun cooldownSeparatesShakes() {
         lieFaceDown(2_000)
         assertEquals(1, jiggle(800, 8f))

@@ -9,17 +9,20 @@ import kotlin.math.sqrt
  * is at least [minSamples] samples with movement above a threshold within [windowMs].
  * Single knocks on the table are too short to count. With `requireFaceDown`, samples only
  * count while gravity still says face down, so a phone being picked up never reads as a
- * shake. After a shake, or after [reset], nothing counts for a quiet period.
+ * shake. After a shake, the movement has to stay below the threshold for [calmMs] before
+ * the next one can count, so one long shake is one shake and shake, stop, shake is two.
+ * After [reset], nothing counts for a quiet period.
  */
 class ShakeFilter(
     private val minSamples: Int = 3,
     private val windowMs: Long = 500L,
-    private val cooldownMs: Long = 1_000L,
+    private val calmMs: Long = 300L,
     private val faceDownGravityZ: Float = -7.0f,
 ) {
     private val gravity = floatArrayOf(0f, 0f, -GRAVITY)
     private val hits = ArrayDeque<Long>()
     private var quietUntilMs = 0L
+    private var lastMovementMs: Long? = null
 
     /** Returns true when this sample completes a shake. */
     fun onSample(x: Float, y: Float, z: Float, nowMs: Long, threshold: Float, requireFaceDown: Boolean): Boolean {
@@ -30,21 +33,30 @@ class ShakeFilter(
             val linear = sample[i] - gravity[i]
             movement += linear * linear
         }
+        val moving = sqrt(movement) > threshold
+        val lastMovement = lastMovementMs
+        if (lastMovement != null) {
+            // Still settling after the last shake.
+            if (moving) lastMovementMs = nowMs
+            else if (nowMs - lastMovement >= calmMs) lastMovementMs = null
+            return false
+        }
         if (nowMs < quietUntilMs || (requireFaceDown && gravity[2] > faceDownGravityZ)) {
             hits.clear()
             return false
         }
-        if (sqrt(movement) > threshold) hits.addLast(nowMs)
+        if (moving) hits.addLast(nowMs)
         while (hits.isNotEmpty() && nowMs - hits.first() > windowMs) hits.removeFirst()
         if (hits.size < minSamples) return false
         hits.clear()
-        quietUntilMs = nowMs + cooldownMs
+        lastMovementMs = nowMs
         return true
     }
 
     /** Ignores movement for [quietMs], e.g. so setting the phone down is not taken as a shake. */
-    fun reset(nowMs: Long, quietMs: Long = cooldownMs) {
+    fun reset(nowMs: Long, quietMs: Long = 1_000L) {
         hits.clear()
+        lastMovementMs = null
         quietUntilMs = nowMs + quietMs
     }
 
