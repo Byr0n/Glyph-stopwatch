@@ -20,8 +20,9 @@ committed here.
 ## Two ways to run it
 
 **Glyph Toy (recommended on the Phone (4a) Pro).** The 4a Pro only runs always on toys, which
-the system shows through Flip to Glyph when the phone goes face down. The system showing the
-toy starts the stopwatch, and picking the phone up stops it. No need to arm anything.
+the system shows through Flip to Glyph. The system can also show the toy at other times, so
+while it is shown the toy checks the accelerometer itself: the stopwatch starts only once the
+phone has been face down for 500 ms, and stops when it is picked up. No need to arm anything.
 
 Shake the phone while it stays face down, for example by jiggling it on the table. Picking it
 up to shake it would stop the timer, and the shake detector ignores the phone once it turns
@@ -49,7 +50,7 @@ showing it draws the time, because the system puts toys above apps on the matrix
 | Class | Job |
 | --- | --- |
 | `TimerSession` | The one shared stopwatch. Redraws each second on the toy's matrix when it is showing, otherwise on the app's. |
-| `StopwatchToy` | Glyph Toy service. Starts the stopwatch when the system shows it, stops it when hidden. A Glyph Button long press pauses on phones that have one. |
+| `StopwatchToy` | Glyph Toy service. While the system shows it, it holds a wake lock and runs `FaceDownDetector`, starting the stopwatch on face down and stopping it on face up or when hidden. A Glyph Button long press pauses on phones that have one. |
 | `TimerService` | App mode foreground service holding a partial wake lock while armed, so the face down sensors keep working. |
 | `FaceDownDetector` + `FlipFilter` | Face down = accelerometer z below -9.0 m/s² for 500 ms with the proximity sensor near. Face up = z above -6.0 m/s² for 500 ms. |
 | `ShakeDetector` + `ShakeFilter` | While the timer is active, a low pass filter removes gravity from the accelerometer. A shake is 3 samples above 4 m/s² of movement within 500 ms while the phone is still face down, then 1 s of cooldown. Placing the phone down is ignored for the first second. |
