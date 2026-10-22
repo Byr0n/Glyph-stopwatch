@@ -8,56 +8,26 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.VibratorManager
 
 /**
- * Foreground service that keeps the stopwatch alive with the screen off. While armed it
- * watches for the phone being placed face down, runs the stopwatch, and draws it on the
- * Glyph Matrix.
+ * Foreground service for app mode. While armed it watches for the phone being placed face
+ * down and drives the shared [TimerSession], drawing through the app's Glyph Matrix access.
  */
 class TimerService : Service() {
-    private val handler = Handler(Looper.getMainLooper())
-    private val stopwatch = Stopwatch()
+    private val session by lazy { TimerSession.get(this) }
     private lateinit var renderer: GlyphRenderer
     private lateinit var detector: FaceDownDetector
     private lateinit var wakeLock: PowerManager.WakeLock
-    private var blinkOn = true
-
-    private val tick = object : Runnable {
-        override fun run() {
-            val now = SystemClock.elapsedRealtime()
-            val elapsed = stopwatch.elapsed(now)
-            when (stopwatch.state) {
-                TimerState.RUNNING -> {
-                    renderer.showElapsed(elapsed)
-                    // Wake just after the next whole second so the display never lags.
-                    handler.postDelayed(this, 1000 - elapsed % 1000 + 5)
-                }
-                TimerState.PAUSED -> {
-                    if (blinkOn) renderer.showElapsed(elapsed, PAUSED_BRIGHTNESS) else renderer.blank()
-                    blinkOn = !blinkOn
-                    handler.postDelayed(this, BLINK_MS)
-                }
-                TimerState.IDLE -> Unit
-            }
-        }
-    }
-
-    private val hideFinalTime = Runnable { renderer.clear() }
 
     override fun onCreate() {
         super.onCreate()
-        renderer = GlyphRenderer(this).also { it.start() }
+        renderer = GlyphRenderer(this, asToy = false).also { it.start() }
+        session.attachApp(renderer)
         detector = FaceDownDetector(this, ::onFlip)
         wakeLock = getSystemService(PowerManager::class.java)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:timer")
-        instance = this
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:armed")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -66,7 +36,7 @@ class TimerService : Service() {
             return START_NOT_STICKY
         }
         startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        // The sensors and the ticking display need the CPU while the screen is off.
+        // The sensors need the CPU while the screen is off.
         if (!wakeLock.isHeld) wakeLock.acquire()
         detector.start()
         armed = true
@@ -75,10 +45,9 @@ class TimerService : Service() {
 
     override fun onDestroy() {
         armed = false
-        instance = null
         detector.stop()
-        handler.removeCallbacksAndMessages(null)
-        stopwatch.stop(SystemClock.elapsedRealtime())
+        session.stop(showFinal = false)
+        session.detachApp(renderer)
         renderer.release()
         if (wakeLock.isHeld) wakeLock.release()
         super.onDestroy()
@@ -87,48 +56,11 @@ class TimerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun onFlip(flip: Flip) {
-        val now = SystemClock.elapsedRealtime()
         when (flip) {
-            Flip.FACE_DOWN -> {
-                handler.removeCallbacks(hideFinalTime)
-                stopwatch.start(now)
-                restartTicking()
-            }
-            Flip.FACE_UP -> {
-                if (stopwatch.state == TimerState.IDLE) return
-                handler.removeCallbacks(tick)
-                // Picking the phone up resets the timer; show the final time briefly first.
-                renderer.showElapsed(stopwatch.stop(now))
-                handler.postDelayed(hideFinalTime, FINAL_TIME_MS)
-            }
+            Flip.FACE_DOWN -> session.start()
+            // Picking the phone up resets the timer; show the final time briefly first.
+            Flip.FACE_UP -> session.stop(showFinal = true)
         }
-    }
-
-    fun onVolumeDown(press: Press) {
-        // A press can resolve after the phone was already picked up.
-        if (stopwatch.state == TimerState.IDLE) return
-        val now = SystemClock.elapsedRealtime()
-        when (press) {
-            Press.SINGLE -> {
-                stopwatch.togglePause(now)
-                vibrate(VibrationEffect.createOneShot(BUZZ_MS, VibrationEffect.DEFAULT_AMPLITUDE))
-            }
-            Press.DOUBLE -> {
-                stopwatch.restart(now)
-                vibrate(VibrationEffect.createWaveform(longArrayOf(0, BUZZ_MS, 80, BUZZ_MS), -1))
-            }
-        }
-        restartTicking()
-    }
-
-    private fun restartTicking() {
-        handler.removeCallbacks(tick)
-        blinkOn = true
-        tick.run()
-    }
-
-    private fun vibrate(effect: VibrationEffect) {
-        getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
     }
 
     private fun buildNotification(): Notification {
@@ -156,22 +88,10 @@ class TimerService : Service() {
         private const val CHANNEL_ID = "timer"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_DISARM = "com.byr0n.glyphstopwatch.DISARM"
-        private const val PAUSED_BRIGHTNESS = 90
-        private const val BLINK_MS = 500L
-        private const val FINAL_TIME_MS = 5_000L
-        private const val BUZZ_MS = 40L
-
-        @Volatile
-        var instance: TimerService? = null
-            private set
 
         @Volatile
         var armed = false
             private set
-
-        /** True while the stopwatch is running or paused, which is when volume down is taken over. */
-        val isTimerActive: Boolean
-            get() = instance?.stopwatch?.state.let { it != null && it != TimerState.IDLE }
 
         fun arm(context: Context) {
             context.startForegroundService(Intent(context, TimerService::class.java))

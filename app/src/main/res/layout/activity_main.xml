@@ -25,6 +25,12 @@
             android:fontFamily="monospace" />
 
         <Button
+            android:id="@+id/toys"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/toys" />
+
+        <Button
             android:id="@+id/arm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

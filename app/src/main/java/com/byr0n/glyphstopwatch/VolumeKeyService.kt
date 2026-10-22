@@ -20,7 +20,7 @@ class VolumeKeyService : AccessibilityService() {
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
-        if (!TimerService.isTimerActive) {
+        if (TimerSession.current?.isActive != true) {
             handler.removeCallbacks(windowElapsed)
             classifier.reset()
             return false
@@ -34,7 +34,7 @@ class VolumeKeyService : AccessibilityService() {
     }
 
     private fun dispatch(press: Press) {
-        TimerService.instance?.onVolumeDown(press)
+        TimerSession.current?.onVolumeDown(press)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit

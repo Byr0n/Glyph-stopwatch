@@ -34,6 +34,31 @@
         </service>
 
         <service
+            android:name=".StopwatchToy"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nothing.glyph.TOY" />
+            </intent-filter>
+            <meta-data
+                android:name="com.nothing.glyph.toy.name"
+                android:resource="@string/toy_name" />
+            <meta-data
+                android:name="com.nothing.glyph.toy.image"
+                android:resource="@drawable/img_toy_preview" />
+            <meta-data
+                android:name="com.nothing.glyph.toy.summary"
+                android:resource="@string/toy_summary" />
+            <!-- The Phone (4a) Pro only runs always-on toys. -->
+            <meta-data
+                android:name="com.nothing.glyph.toy.aod_support"
+                android:value="1" />
+            <!-- Long press of the Glyph Button pauses, on phones that have one. -->
+            <meta-data
+                android:name="com.nothing.glyph.toy.longpress"
+                android:value="1" />
+        </service>
+
+        <service
             android:name=".VolumeKeyService"
             android:exported="false"
             android:label="@string/accessibility_label"

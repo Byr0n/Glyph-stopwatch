@@ -10,9 +10,10 @@ import com.nothing.ketchum.GlyphMatrixManager
 
 /**
  * Draws onto the Glyph Matrix through the Nothing SDK. Frames sent before the Glyph
- * service connects are held and shown once it does.
+ * service connects are held and shown once it does. A toy draws with the toy calls; the
+ * app uses the app calls, which the system shows below any active toy.
  */
-class GlyphRenderer(context: Context) {
+class GlyphRenderer(context: Context, private val asToy: Boolean) {
     private val manager = GlyphMatrixManager.getInstance(context.applicationContext)
     private var connected = false
     private var pendingFrame: IntArray? = null
@@ -23,7 +24,7 @@ class GlyphRenderer(context: Context) {
         override fun onServiceConnected(name: ComponentName) {
             manager.register(if (Common.is23112()) Glyph.DEVICE_23112 else Glyph.DEVICE_25111p)
             connected = true
-            safely { manager.setGlyphMatrixTimeout(false) }
+            if (!asToy) safely { manager.setGlyphMatrixTimeout(false) }
             pendingFrame?.let { send(it) }
             pendingFrame = null
         }
@@ -52,7 +53,8 @@ class GlyphRenderer(context: Context) {
     /** Turns the matrix off and hands it back to the system. */
     fun clear() {
         pendingFrame = null
-        if (connected) safely { manager.closeAppMatrix() }
+        if (!connected) return
+        if (asToy) manager.turnOff() else safely { manager.closeAppMatrix() }
     }
 
     fun release() {
@@ -66,7 +68,7 @@ class GlyphRenderer(context: Context) {
             pendingFrame = frame
             return
         }
-        safely { manager.setAppMatrixFrame(frame) }
+        safely { if (asToy) manager.setMatrixFrame(frame) else manager.setAppMatrixFrame(frame) }
     }
 
     private inline fun safely(block: () -> Unit) {

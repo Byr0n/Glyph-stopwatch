@@ -2,6 +2,7 @@ package com.byr0n.glyphstopwatch
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +12,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 
 /** Setup screen: arms the timer and walks through the permissions it needs. */
 class MainActivity : Activity() {
@@ -40,9 +42,16 @@ class MainActivity : Activity() {
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
             )
         }
+        findViewById<Button>(R.id.toys).setOnClickListener {
+            try {
+                startActivity(Intent().setComponent(TOYS_MANAGER))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, R.string.toys_unavailable, Toast.LENGTH_LONG).show()
+            }
+        }
         findViewById<Button>(R.id.test_pattern).setOnClickListener {
             if (testRenderer == null) {
-                testRenderer = GlyphRenderer(this).also {
+                testRenderer = GlyphRenderer(this, asToy = false).also {
                     it.start()
                     it.showPair(12, 34)
                 }
@@ -88,5 +97,12 @@ class MainActivity : Activity() {
             ?: return false
         val ours = ComponentName(this, VolumeKeyService::class.java)
         return enabled.split(':').any { ComponentName.unflattenFromString(it) == ours }
+    }
+
+    private companion object {
+        // Nothing's Manage Glyph Toys screen, where the user adds the toy to their list.
+        val TOYS_MANAGER = ComponentName(
+            "com.nothing.thirdparty", "com.nothing.thirdparty.matrix.toys.manager.ToysManagerActivity"
+        )
     }
 }
