@@ -1,9 +1,6 @@
 package com.byr0n.glyphstopwatch
 
 import android.content.Context
-import android.media.VolumeProvider
-import android.media.session.MediaSession
-import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -16,21 +13,15 @@ import android.os.VibratorManager
  * start and stop it; it draws on the toy's matrix when the toy is showing, otherwise on
  * the app's. Call everything on the main thread.
  *
- * Volume down reaches it two ways. With the screen on, [VolumeKeyService] catches the key.
- * With the screen off Android does not pass volume keys to accessibility services, so while
- * the stopwatch is active a media session with remote volume takes them instead. Both feed
- * the same [PressClassifier].
+ * While it is active a shake of the face down phone pauses it, and another shake restarts
+ * it from zero.
  */
 class TimerSession private constructor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private val stopwatch = Stopwatch()
     private val wakeLock = context.getSystemService(PowerManager::class.java)
         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlyphStopwatch:session")
-    private val classifier = PressClassifier()
-    private val windowElapsed = Runnable {
-        classifier.onWindowElapsed(SystemClock.uptimeMillis())?.let(::onVolumeDown)
-    }
-    private var mediaSession: MediaSession? = null
+    private val shakes = ShakeDetector(context, ::onShake)
     private var blinkOn = true
     private var finalTimeMs: Long? = null
 
@@ -41,7 +32,7 @@ class TimerSession private constructor(private val context: Context) {
     private val renderer: GlyphRenderer?
         get() = toyRenderer ?: appRenderer
 
-    /** True while the stopwatch is running or paused, which is when volume down is taken over. */
+    /** True while the stopwatch is running or paused. */
     val isActive: Boolean
         get() = stopwatch.state != TimerState.IDLE
 
@@ -95,7 +86,7 @@ class TimerSession private constructor(private val context: Context) {
         finalTimeMs = null
         stopwatch.start(SystemClock.elapsedRealtime())
         if (!wakeLock.isHeld) wakeLock.acquire()
-        captureVolumeKeys()
+        shakes.start()
         redraw()
     }
 
@@ -105,7 +96,7 @@ class TimerSession private constructor(private val context: Context) {
         handler.removeCallbacks(tick)
         val finalMs = stopwatch.stop(SystemClock.elapsedRealtime())
         if (wakeLock.isHeld) wakeLock.release()
-        releaseVolumeKeys()
+        shakes.stop()
         if (showFinal) {
             finalTimeMs = finalMs
             handler.postDelayed(hideFinalTime, FINAL_TIME_MS)
@@ -123,24 +114,16 @@ class TimerSession private constructor(private val context: Context) {
         redraw()
     }
 
-    /** Reports one volume down key press, from whichever path caught it. */
-    fun onVolumeDownPressed(uptimeMs: Long) {
-        if (!isActive) return
-        handler.removeCallbacks(windowElapsed)
-        val press = classifier.onPress(uptimeMs)
-        if (press != null) onVolumeDown(press) else handler.postDelayed(windowElapsed, classifier.windowMs)
-    }
-
-    private fun onVolumeDown(press: Press) {
-        // A press can resolve after the phone was already picked up.
-        if (!isActive) return
-        when (press) {
-            Press.SINGLE -> togglePause()
-            Press.DOUBLE -> {
+    /** Running: pause. Paused: restart from zero and keep counting. */
+    private fun onShake() {
+        when (stopwatch.state) {
+            TimerState.RUNNING -> togglePause()
+            TimerState.PAUSED -> {
                 stopwatch.restart(SystemClock.elapsedRealtime())
                 vibrate(VibrationEffect.createWaveform(longArrayOf(0, BUZZ_MS, 80, BUZZ_MS), -1))
                 redraw()
             }
+            TimerState.IDLE -> Unit
         }
     }
 
@@ -156,28 +139,6 @@ class TimerSession private constructor(private val context: Context) {
         }
     }
 
-    private fun captureVolumeKeys() {
-        if (mediaSession != null) return
-        val volume = object : VolumeProvider(VolumeProvider.VOLUME_CONTROL_RELATIVE, VOLUME_MAX, VOLUME_MAX / 2) {
-            override fun onAdjustVolume(direction: Int) {
-                if (direction < 0) onVolumeDownPressed(SystemClock.uptimeMillis())
-            }
-        }
-        mediaSession = MediaSession(context, "GlyphStopwatch").apply {
-            setPlaybackToRemote(volume)
-            // Android only sends volume keys to a session that reports it is playing.
-            setPlaybackState(PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1f).build())
-            isActive = true
-        }
-    }
-
-    private fun releaseVolumeKeys() {
-        handler.removeCallbacks(windowElapsed)
-        classifier.reset()
-        mediaSession?.release()
-        mediaSession = null
-    }
-
     private fun vibrate(effect: VibrationEffect) {
         context.getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
     }
@@ -187,7 +148,6 @@ class TimerSession private constructor(private val context: Context) {
         private const val BLINK_MS = 500L
         private const val FINAL_TIME_MS = 5_000L
         private const val BUZZ_MS = 40L
-        private const val VOLUME_MAX = 100
 
         @Volatile
         private var instance: TimerSession? = null
@@ -196,9 +156,5 @@ class TimerSession private constructor(private val context: Context) {
             instance ?: synchronized(this) {
                 instance ?: TimerSession(context.applicationContext).also { instance = it }
             }
-
-        /** The session if one exists, without creating it. */
-        val current: TimerSession?
-            get() = instance
     }
 }

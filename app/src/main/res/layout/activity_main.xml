@@ -37,12 +37,6 @@
             android:text="@string/arm" />
 
         <Button
-            android:id="@+id/accessibility"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/accessibility" />
-
-        <Button
             android:id="@+id/battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

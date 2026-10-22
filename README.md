@@ -3,8 +3,8 @@
 A stopwatch for the Nothing Phone (4a) Pro that shows on the Glyph Matrix.
 
 * Place the phone face down: the stopwatch starts.
-* Press volume down once: pause (one short buzz). Press once again: resume.
-* Press volume down twice within about 400 ms: restart from 0:00 (two quick buzzes).
+* Shake the phone while it is still face down: pause (one short buzz).
+* Shake again while paused: restart from 0:00 and keep counting (two quick buzzes).
 * Pick the phone up: the final time shows for 5 seconds, then the timer resets and the matrix turns off.
 
 The 4a Pro matrix is a 13 x 13 grid with 137 LEDs in a circle (the corners have none), too
@@ -23,6 +23,10 @@ committed here.
 the system shows through Flip to Glyph when the phone goes face down. The system showing the
 toy starts the stopwatch, and picking the phone up stops it. No need to arm anything.
 
+Shake the phone while it stays face down, for example by jiggling it on the table. Picking it
+up to shake it would stop the timer, and the shake detector ignores the phone once it turns
+over, so a pick up never counts as a shake.
+
 **App mode.** Arm the timer in the app. It watches the accelerometer itself and draws with the
 app's own Glyph Matrix access. Use this if you would rather keep Flip to Glyph off.
 
@@ -32,15 +36,13 @@ showing it draws the time, because the system puts toys above apps on the matrix
 ## Setup on the phone
 
 1. Install the app and open it.
-2. Tap **Open accessibility settings** and turn on **Glyph Stopwatch volume keys**. Volume
-   down works the same in both modes.
-3. Tap **Exempt from battery optimisation** so the timer keeps running.
-4. Optional: tap **Show test pattern 12:34** to check the matrix works.
-5. For the toy: tap **Add to Glyph Toys** and add **Stopwatch**. Then go to Settings > Glyph
+2. Tap **Exempt from battery optimisation** so the timer keeps running.
+3. Optional: tap **Show test pattern 12:34** to check the matrix works.
+4. For the toy: tap **Add to Glyph Toys** and add **Stopwatch**. Then go to Settings > Glyph
    Interface > Flip to Glyph > Always-on Glyph Toy and pick it.
-6. For app mode instead: tap **Arm timer**. If Flip to Glyph is on with another toy, that toy
+5. For app mode instead: tap **Arm timer**. If Flip to Glyph is on with another toy, that toy
    will draw over the stopwatch, so pick Stopwatch there or turn Flip to Glyph off.
-7. Place the phone face down.
+6. Place the phone face down.
 
 ## How it works
 
@@ -50,19 +52,15 @@ showing it draws the time, because the system puts toys above apps on the matrix
 | `StopwatchToy` | Glyph Toy service. Starts the stopwatch when the system shows it, stops it when hidden. A Glyph Button long press pauses on phones that have one. |
 | `TimerService` | App mode foreground service holding a partial wake lock while armed, so the face down sensors keep working. |
 | `FaceDownDetector` + `FlipFilter` | Face down = accelerometer z below -9.0 m/s² for 500 ms with the proximity sensor near. Face up = z above -6.0 m/s² for 500 ms. |
-| `VolumeKeyService` | Accessibility service that takes over volume down while the timer is running or paused and the screen is on. |
-| Media session in `TimerSession` | Android does not pass volume keys to accessibility services with the screen off, so while the timer is active a media session with remote volume takes them. Volume up does nothing during that time. |
-| `PressClassifier` | Splits single from double presses with a 400 ms window, for presses from either path. |
+| `ShakeDetector` + `ShakeFilter` | While the timer is active, a low pass filter removes gravity from the accelerometer. A shake is 3 samples above 4 m/s² of movement within 500 ms while the phone is still face down, then 1 s of cooldown. Placing the phone down is ignored for the first second. |
 | `GlyphRenderer` + `MatrixDigits` | Draws the digits with a 3 x 5 pixel font and sends them with `setAppMatrixFrame`. |
 | `Stopwatch` | Pure state machine: IDLE, RUNNING, PAUSED. |
 
-`Stopwatch`, `PressClassifier`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
+`Stopwatch`, `ShakeFilter`, `FlipFilter` and `MatrixDigits` have no Android dependencies and
 are covered by unit tests in `app/src/test`.
 
 ## Still to do
 
-* Test on the phone with the screen off and tune the thresholds in `FlipFilter` and `PressClassifier`.
+* Test on the phone with the screen off and tune the thresholds in `FlipFilter` and `ShakeFilter`.
 * Check how often the system lets an always on toy redraw. The toy draws every second, but if
   the phone only refreshes it on the once a minute AOD event, the seconds will not show.
-* If volume presses still do not arrive with the screen off, the media session may also need a
-  silent audio track playing, as the spec suggests.

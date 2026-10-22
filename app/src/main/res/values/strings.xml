@@ -1,23 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Glyph Stopwatch</string>
-    <string name="intro">Add the Stopwatch toy and set it as the always-on Glyph Toy, or arm the timer here. Then place the phone face down to start it. Volume down once to pause or resume, twice to restart from zero. Pick the phone up to stop.</string>
+    <string name="intro">Add the Stopwatch toy and set it as the always-on Glyph Toy, or arm the timer here. Then place the phone face down to start it. Shake it while face down to pause; shake again to restart from zero. Pick the phone up to stop.</string>
     <string name="arm">Arm timer</string>
     <string name="disarm">Disarm</string>
-    <string name="accessibility">Open accessibility settings</string>
     <string name="battery">Exempt from battery optimisation</string>
     <string name="toys">Add to Glyph Toys</string>
     <string name="toys_unavailable">Glyph Toys manager not found. Update the phone\'s system software.</string>
     <string name="toy_name">Stopwatch</string>
-    <string name="toy_summary">Counts up while the phone is face down. Volume down pauses; twice restarts.</string>
+    <string name="toy_summary">Counts up while the phone is face down. Shake to pause; shake again to restart.</string>
     <string name="test_pattern">Show test pattern 12:34</string>
     <string name="test_pattern_off">Hide test pattern</string>
-    <string name="status">Armed: %1$s\nVolume key service: %2$s\nBattery exempt: %3$s</string>
+    <string name="status">Armed: %1$s\nBattery exempt: %2$s</string>
     <string name="yes">yes</string>
     <string name="no">no</string>
     <string name="channel_name">Timer</string>
     <string name="notification_title">Glyph Stopwatch armed</string>
     <string name="notification_text">Place the phone face down to start.</string>
-    <string name="accessibility_label">Glyph Stopwatch volume keys</string>
-    <string name="accessibility_description">Lets volume down pause, resume and restart the Glyph Stopwatch while it is running. Volume keys work normally at all other times.</string>
 </resources>

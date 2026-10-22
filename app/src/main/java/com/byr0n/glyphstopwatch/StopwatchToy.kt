@@ -13,7 +13,7 @@ import com.nothing.ketchum.GlyphToy
  * Glyph Toy mode. On the Phone (4a) Pro toys are always-on toys that the system shows
  * through Flip to Glyph, so the system binding this service means the phone was just
  * placed face down: the stopwatch starts. Unbinding (picked up, or another toy chosen)
- * stops it. Volume down still works through [VolumeKeyService].
+ * stops it. Shakes pause and restart it through [TimerSession].
  */
 class StopwatchToy : Service() {
     private val session by lazy { TimerSession.get(this) }

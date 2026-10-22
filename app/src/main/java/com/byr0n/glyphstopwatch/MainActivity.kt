@@ -34,9 +34,6 @@ class MainActivity : Activity() {
             }
             it.postDelayed(::refresh, 300)
         }
-        findViewById<Button>(R.id.accessibility).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
         findViewById<Button>(R.id.battery).setOnClickListener {
             startActivity(
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
@@ -78,7 +75,6 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
-        val accessibilityOn = isAccessibilityServiceEnabled()
         val batteryExempt = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
         findViewById<Button>(R.id.arm).setText(if (TimerService.armed) R.string.disarm else R.string.arm)
@@ -87,16 +83,8 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.status).text = getString(
             R.string.status,
             getString(if (TimerService.armed) R.string.yes else R.string.no),
-            getString(if (accessibilityOn) R.string.yes else R.string.no),
             getString(if (batteryExempt) R.string.yes else R.string.no),
         )
-    }
-
-    private fun isAccessibilityServiceEnabled(): Boolean {
-        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            ?: return false
-        val ours = ComponentName(this, VolumeKeyService::class.java)
-        return enabled.split(':').any { ComponentName.unflattenFromString(it) == ours }
     }
 
     private companion object {
